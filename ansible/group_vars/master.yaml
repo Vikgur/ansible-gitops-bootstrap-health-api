@@ -1,6 +1,8 @@
 environment:
   KUBECONFIG: /etc/rancher/k3s/k3s.yaml
 
+argocd_config_repo_path: /home/ubuntu/argocd-config-health-api
+
 kubeconfig_path: /etc/rancher/k3s/k3s.yaml
 argocd_namespace: argocd
 

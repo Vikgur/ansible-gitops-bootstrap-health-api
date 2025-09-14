@@ -46,3 +46,10 @@
 - name: Показать результат проверки kubernetes-модуля
   ansible.builtin.debug:
     var: k8s_module_check.stderr
+
+- name: Установить kustomize через snap
+  shell: |
+    if ! command -v kustomize &> /dev/null; then
+      sudo snap install kustomize
+    fi
+  tags: [packages]

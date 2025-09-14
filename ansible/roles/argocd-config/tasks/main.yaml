@@ -1,0 +1,8 @@
+- name: Применить конфигурацию Argo CD из argocd-config-health-api
+  shell: |
+    kustomize build {{ argocd_config_repo_path }} | kubectl apply -f -
+  args:
+    executable: /bin/bash
+  register: result
+  changed_when: "'configured' in result.stdout"
+  tags: [argocd, config]

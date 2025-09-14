@@ -20,6 +20,8 @@
   - [Логика шагов деплоя](#логика-шагов-деплоя)  
 - [Плейбук: шаги выполнения](#плейбук-шаги-выполнения)  
 - [Внедренные DevSecOps практики](#внедренные-devsecops-практики)  
+  - [Доступ и безопасность](#доступ-и-безопасность)
+  - [RBAC и защита Argo CD](#rbac-и-защита-argo-cd)
   - [Архитектура безопасности](#архитектура-безопасности)  
   - [Покрытие](#покрытие)  
     - [Базовые проверки](#базовые-проверки)  
@@ -39,14 +41,15 @@
 Данный проект — рабочее автоматизированное конфигурационное управление для веб-приложения [`health-api`](https://github.com/vikgur/health-api-for-microservice-stack) с использованием **Ansible** и **GitOps на базе Argo CD**.  
 Репозиторий выполняет bootstrap k3s-кластера на виртуальных машинах в **Yandex Cloud**, устанавливает системные компоненты (ingress, Argo CD, секреты GHCR) и готовит окружение для дальнейшего управления через GitOps.  
 
-Основные задачи:  
+Основные задачи:
 * полная автоматизация установки и настройки master/worker-нод;  
 * подготовка окружения для Argo CD и GitOps-паттерна;  
+* применение конфигурации Projects, RBAC и Git-репозиториев из [`argocd-config-health-api`](https://github.com/vikgur/argocd-config-health-api);  
 * настройка доступа к приватному реестру GHCR;  
 * установка ingress-контроллера;  
 * использование [Makefile](#точка-запуска-makefile) и серии `bash-скриптов` для воспроизводимого запуска шагов;  
-* внедрение актуальных [DevSecOps-практик](#внедренные-devsecops-практики) с оптимальным покрытием.  
-* организация доставки образов по [GitOps-сценарию](#gitops-сценарий)
+* внедрение актуальных [DevSecOps-практик](#внедренные-devsecops-практики) с оптимальным покрытием;  
+* организация доставки образов по [GitOps-сценарию](#gitops-сценарий).
 
 ![UI](images/argo_cd.png)
 
@@ -99,9 +102,9 @@
 
 ## Скрипты Ansible
 
-* **add\_ips\_to\_hosts.sh** — собирает IP-адреса нод и формирует `ansible/inventories/<env>/hosts.yaml`.
-* **sync\_to\_master.sh** — синхронизирует каталоги (`ansible/`, `helm/`, `charts/`) на мастер-ноду.
-* **run\_ansible\_on\_master.sh** — запускает Ansible-плейбук уже с мастер-ноды (используется в целях `make deploy`, `make bootstrap-argocd`).
+* **add_ips_to_hosts.sh** — собирает IP-адреса нод и формирует `ansible/inventories/<env>/hosts.yaml`.
+* **sync_to_master.sh** — синхронизирует каталоги (`ansible/`, `helm/`, `charts/`) на мастер-ноду.
+* **run_ansible_on_master.sh** — запускает Ansible-плейбук уже с мастер-ноды (используется в целях `make deploy`, `make bootstrap-argocd`) и включает применение конфигурации Argo CD (Projects, RBAC, Git-репозитории) из склонированного GitOps-репозитория.
 
 ---
 
@@ -140,7 +143,8 @@
 
 #### Основные (GitOps):
    * **argocd** — установка и bootstrap Argo CD в кластер.  
-   * **common** — базовые настройки окружения (пакеты, ssh, системные утилиты).  
+   * **argocd-config** — настройка Projects, RBAC, Git-репозиториев и параметров контроллера Argo CD из клонированного репо argocd-config-health-api.
+   * **common** — базовые настройки окружения (пакеты, ssh, системные утилиты).
    * **docker** — установка и настройка docker/ctr утилит, нужных для работы с образами.  
    * **ghcr** — настройка доступа к GitHub Container Registry (секреты, логин).  
    * **ingress** — настройка ingress-nginx контроллера и зависимостей.  
@@ -239,16 +243,19 @@
 
 ---
 
-# Плейбук: шаги выполнения
+## Плейбук: шаги выполнения
 
 1. **Базовая подготовка** — установка утилит, пакетов и Python-модуля для Kubernetes.
 2. **Агенты** — разворачивание worker-нод k3s и подключение их к мастеру.
 3. **Namespace** — создание пространства `health-api` для приложений.
 4. **Инструменты** — установка Helm, Helmfile и плагинов на мастер.
-5. **Ingress** — разворачивание ingress-nginx для внешнего трафика.
-6. **Argo CD** — установка Argo CD в namespace `argocd`.
-7. **GHCR секреты** — создание `ghcr-secret` в `argocd` и `health-api` для доступа к приватным образам.
-8. **Проверки** — проверка, что все ноды находятся в статусе Ready. 
+5. **Docker** — установка Docker при необходимости (вспомогательные задачи).
+6. **Ingress** — разворачивание ingress-nginx для внешнего трафика.
+7. **Argo CD** — установка Argo CD в namespace `argocd`.
+8. **GHCR секреты** — создание `ghcr-secret` в `argocd` и `health-api` для доступа к приватным образам.
+9. **Проверки** — проверка, что все ноды находятся в статусе Ready.
+10. **Argo CD Config** — применение конфигурации Argo CD (Projects, RBAC, Repos) из `argocd-config-health-api`.
+11. **NodePort (опционально)** — патчинг ingress-сервиса в режим `NodePort` для доступа без внешнего ingress-контроллера.
 
 ---
 
@@ -281,6 +288,17 @@ htpasswd -nbBC 10 admin 'MyStrongPass123' | cut -d: -f2
 * Ограничение по IP (Ingress annotations / firewall)
 
 Если поднят Ingress на `argocd.<домен>` и он доступен из интернета, то страницу входа сможет открыть любой.
+
+## RBAC и защита Argo CD
+
+В Argo CD реализовано централизованное разграничение прав доступа через **RBAC-политику**, определённую в `argocd-config-health-api` (файл `argocd/cm/argocd-rbac-cm.yaml`):
+
+* Роль `admin` — полный доступ ко всем приложениям и проектам  
+* Роль `stage-admin` — ограниченный доступ только к окружению `stage`  
+* Назначение ролей по группам (`g:devops`, `g:qa`)  
+* Защита `prod` через sync-окна, ограничивающие время деплоя
+
+RBAC-политика управляется через GitOps и применяется автоматически из конфигурационного репозитория. Это исключает ручные ошибки и обеспечивает аудит изменений.
 
 ## Архитектура безопасности
 
@@ -385,13 +403,14 @@ make lint-security
 
 Краткий маппинг практик проекта на OWASP Top-10:
 
-- **A1 Broken Access Control** → закрытые воркеры, доступ только через мастер, паттерн stage/prod.  
-- **A2 Cryptographic Failures** → Ansible Vault для секретов, bcrypt-хэш для пароля Argo CD, `.vault_pass.txt` вне Git.  
-- **A3 Injection** → отсутствие секретов в коде, линтеры YAML и bash.  
-- **A4 Insecure Design** → политика ansible-lint (production profile), паттерн stage/prod.  
-- **A5 Security Misconfiguration** → deny by default, закрытые порты, линтеры.  
-- **A6 Vulnerable and Outdated Components** → частично: ansible-lint проверяет роли, обновления пакетов вручную.  
-- **A7 Identification and Authentication Failures** → bcrypt для UI Argo CD, токены GHCR в Vault, отдельного RBAC для ansible-инфры нет.  
-- **A8 Software and Data Integrity Failures** → pre-commit, доставка образов только через мастер.  
-- **A9 Security Logging and Monitoring Failures** → частично: централизованное логирование планируется (например, Loki).  
-- **A10 SSRF** → малоприменимо в Ansible, ограничение внешних `get_url` и контроль источников.  
+- **A1 Broken Access Control** → закрытые воркеры, доступ только через мастер, паттерн stage/prod, централизованный RBAC в Argo CD с разграничением по ролям и namespace.
+- **A2 Cryptographic Failures** → Ansible Vault для секретов, bcrypt-хэш для пароля Argo CD, `.vault_pass.txt` исключён из Git.
+- **A3 Injection** → отсутствие секретов в коде, использование ansible-lint, yamllint, shellcheck.
+- **A4 Insecure Design** → строгая структура stage/prod, ansible-lint c production-профилем, контроль sync-окон в prod.
+- **A5 Security Misconfiguration** → закрытые порты, deny-by-default, ограничение прав в Argo CD, проверка конфигураций.
+- **A6 Vulnerable and Outdated Components** → частично: ansible-lint проверяет роли, базовое обновление пакетов через common-роль.
+- **A7 Identification and Authentication Failures** → bcrypt-авторизация в Argo CD, централизованный доступ через RBAC и группы (`g:devops`, `g:qa`), токены GHCR в Vault.
+- **A8 Software and Data Integrity Failures** → pre-commit хуки, централизованная доставка образов через master.
+- **A9 Security Logging and Monitoring Failures** → частично: планируется централизованное логирование (Loki, Promtail).
+- **A10 SSRF** → ограничение на внешние `get_url`, контроль источников в задачах Ansible.
+
