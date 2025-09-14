@@ -1,0 +1,51 @@
+- name: Убедиться, что Docker доступен
+  command: docker --version
+  register: docker_check
+  failed_when: docker_check.rc != 0
+  changed_when: false
+  become: true
+
+- name: Pull образ backend
+  become: true
+  shell: docker pull ghcr.io/vik-devops-lab/health-api-backend:{{ VERSION }}
+
+- name: Pull образ frontend
+  become: true
+  shell: docker pull ghcr.io/vik-devops-lab/health-api-frontend:{{ VERSION }}
+
+- name: Явно тегнуть backend
+  become: true
+  shell: docker tag ghcr.io/vik-devops-lab/health-api-backend:{{ VERSION }} ghcr.io/vik-devops-lab/health-api-backend:{{ VERSION }}
+
+- name: Явно тегнуть frontend
+  become: true
+  shell: docker tag ghcr.io/vik-devops-lab/health-api-frontend:{{ VERSION }} ghcr.io/vik-devops-lab/health-api-frontend:{{ VERSION }}
+
+- name: Сохранить backend.tar
+  become: true
+  shell: docker save ghcr.io/vik-devops-lab/health-api-backend:{{ VERSION }} -o /tmp/backend.tar
+  args:
+    creates: /tmp/backend.tar
+
+- name: Сохранить frontend.tar
+  become: true
+  shell: docker save ghcr.io/vik-devops-lab/health-api-frontend:{{ VERSION }} -o /tmp/frontend.tar
+  args:
+    creates: /tmp/frontend.tar
+
+- name: Дать права на .tar
+  become: true
+  file:
+    path: "{{ item }}"
+    mode: '0644'
+  loop:
+    - /tmp/backend.tar
+    - /tmp/frontend.tar
+
+- name: Копировать .tar на воркеры
+  include_tasks: copy_to_worker.yaml
+  loop:
+    - 10.0.0.7
+    - 10.0.0.17
+  loop_control:
+    loop_var: target_ip

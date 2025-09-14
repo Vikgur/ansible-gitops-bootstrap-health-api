@@ -1,0 +1,16 @@
+# виртуальные окружения и кэш
+.venv/
+__pycache__/
+*.pyc
+
+# временные файлы Ansible
+*.retry
+*.log
+
+# tar-образы и архивы
+*.tar
+*.tgz
+
+# ansible vault пароль (никогда не хранить в Git)
+ansible/.vault_pass.txt
+ansible/group_vars/vault/*

@@ -1,0 +1,56 @@
+- name: Экспорт KUBECONFIG
+  set_fact:
+    kubeconfig_path_effective: "{{ kubeconfig_path | default('/etc/rancher/k3s/k3s.yaml') }}"
+
+- name: Создать namespace Argo CD (идемпотентно)
+  shell: KUBECONFIG={{ kubeconfig_path_effective }} k3s kubectl create ns {{ argocd_namespace | default('argocd') }} || true
+  changed_when: false
+
+- name: Установить Argo CD манифестом
+  shell: KUBECONFIG={{ kubeconfig_path_effective }} k3s kubectl apply -n {{ argocd_namespace | default('argocd') }} -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+  args: { executable: /bin/bash }
+
+- name: Дождаться готовности core-подов
+  shell: |
+    set -e
+    KUBECONFIG={{ kubeconfig_path_effective }} k3s kubectl -n {{ argocd_namespace | default('argocd') }} rollout status deploy/argocd-repo-server --timeout=300s
+    KUBECONFIG={{ kubeconfig_path_effective }} k3s kubectl -n {{ argocd_namespace | default('argocd') }} rollout status deploy/argocd-server --timeout=300s
+    KUBECONFIG={{ kubeconfig_path_effective }} k3s kubectl -n {{ argocd_namespace | default('argocd') }} rollout status statefulset/argocd-application-controller --timeout=300s
+  args: { executable: /bin/bash }
+  changed_when: false
+
+- name: Задать admin пароль (bcrypt)
+  shell: |
+    KUBECONFIG={{ kubeconfig_path_effective }} k3s kubectl -n {{ argocd_namespace | default('argocd') }} patch secret argocd-secret \
+      -p '{"stringData":{"admin.password":"{{ admin_password_bcrypt }}","admin.passwordMtime":"'$(date -u +%FT%TZ)'"}}'
+  args: { executable: /bin/bash }
+  when: admin_password_bcrypt is defined
+
+- name: Применить базовый argocd-cm
+  template:
+    src: argocd-cm.yaml.j2
+    dest: /tmp/argocd-cm.yaml
+
+- name: kubectl apply argocd-cm
+  shell: KUBECONFIG={{ kubeconfig_path_effective }} k3s kubectl -n {{ argocd_namespace | default('argocd') }} apply -f /tmp/argocd-cm.yaml
+  changed_when: false
+
+- name: Применить базовый RBAC
+  template:
+    src: argocd-rbac-cm.yaml.j2
+    dest: /tmp/argocd-rbac-cm.yaml
+
+- name: kubectl apply RBAC
+  shell: KUBECONFIG={{ kubeconfig_path_effective }} k3s kubectl -n {{ argocd_namespace | default('argocd') }} apply -f /tmp/argocd-rbac-cm.yaml
+  changed_when: false
+
+- name: Применить Ingress для UI (Traefik по умолчанию)
+  when: argocd_host is defined
+  template:
+    src: ingress.yaml.j2
+    dest: /tmp/argocd-ingress.yaml
+
+- name: kubectl apply ingress
+  when: argocd_host is defined
+  shell: KUBECONFIG={{ kubeconfig_path_effective }} k3s kubectl -n {{ argocd_namespace | default('argocd') }} apply -f /tmp/argocd-ingress.yaml
+  changed_when: false

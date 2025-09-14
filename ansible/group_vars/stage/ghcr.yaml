@@ -1,0 +1,4 @@
+ghcr_user: Vikgur
+ghcr_email: viktorgurko@gmail.com
+ghcr_token: "{{ vault_ghcr_token }}"
+deploy_delete_enabled: true

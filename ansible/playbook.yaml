@@ -1,0 +1,81 @@
+- name: Установить базовые пакеты
+  hosts: master
+  become: true
+  roles:
+    - common
+
+- name: Установить k3s-агенты
+  hosts: workers
+  become: true
+  tasks:
+    - name: Установка агента k3s
+      include_role:
+        name: k3s
+        tasks_from: agent
+
+- name: Проверить поды на мастере
+  hosts: master
+  become: true
+  tasks:
+    - name: Проверка подов
+      include_role:
+        name: k3s
+        tasks_from: check_pods
+
+- name: Создать namespace для приложения
+  hosts: master
+  become: true
+  tasks:
+    - name: Создать namespace health-api
+      include_role:
+        name: k3s
+        tasks_from: master
+
+- name: Установить kubernetes-инструменты (helm, helmfile, плагины)
+  hosts: master
+  become: true
+  roles:
+    - kubernetes-tools
+
+- name: Установить Docker (если требуется для вспом. задач)
+  hosts: master
+  become: true
+  roles:
+    - docker
+
+- name: Установить ingress-nginx (если не установлен)
+  hosts: master
+  become: true
+  roles:
+    - ingress
+  tags: [ingress]
+
+- name: Bootstrap Argo CD
+  hosts: master
+  become: true
+  roles:
+    - argocd
+
+- name: Создать imagePullSecret для GHCR (argocd и health-api)
+  hosts: master
+  become: true
+  roles:
+    - ghcr
+
+- name: Проверить, что все ноды Ready
+  hosts: master
+  become: true
+  tasks:
+    - name: Проверка нод
+      include_role:
+        name: k3s
+        tasks_from: check_nodes
+
+# Опционально: если нужен NodePort для nginx
+- name: Патчим nginx-сервис до NodePort
+  hosts: master
+  become: true
+  gather_facts: false
+  tags: [nginx_fix]
+  roles:
+    - nginx_fix

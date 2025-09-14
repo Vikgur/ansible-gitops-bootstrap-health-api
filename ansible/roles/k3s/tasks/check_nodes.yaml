@@ -1,0 +1,7 @@
+- name: Проверка, что все воркеры в статусе Ready
+  become: true
+  shell: |
+    k3s kubectl get nodes --no-headers | grep -v k3s-master | awk '{print $2}' | grep -qv NotReady
+  register: node_ready_check
+  failed_when: node_ready_check.rc != 0
+  changed_when: false

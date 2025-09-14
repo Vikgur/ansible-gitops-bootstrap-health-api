@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-rbac-cm
+  namespace: {{ argocd_namespace | default('argocd') }}
+data:
+  policy.csv: |
+    p, role:admin, applications, *, *, allow
+    p, role:admin, projects, *, *, allow
+    p, role:admin, clusters, *, *, allow
+    p, role:admin, repositories, *, *, allow
+    g, admin, role:admin
+  policy.default: role:readonly
+  scopes: "[groups]"

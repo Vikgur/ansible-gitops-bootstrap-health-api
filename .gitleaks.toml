@@ -1,0 +1,21 @@
+title = "ansible-manual-health-api gitleaks"
+
+[extend]
+# встроенные правила gitleaks
+path = ""
+
+[allowlist]
+description = "ignore encrypted vault files, binaries and images"
+files = [
+  '''ansible/group_vars/vault/.*''',
+  '''ansible/roles/.*/files/.*\.(tar|tgz|gz)$''',
+  '''\.venv/.*''',
+  '''__pycache__/.*'''
+]
+# примеры не-утечек
+regexes = [
+  '''(?i)example|dummy|sample|changeme'''
+]
+
+[rules]
+# можно оставить пустым, используются дефолтные правила gitleaks

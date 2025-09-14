@@ -1,0 +1,51 @@
+- name: Установить Helm
+  shell: curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  args:
+    executable: /bin/bash
+  register: helm_install
+  changed_when: "'Helm v3' in helm_install.stdout or 'is already installed' not in helm_install.stdout"
+
+- name: Проверка — Helm установлен
+  command: helm version --short
+  register: helm_final_check
+  changed_when: false
+  failed_when: helm_final_check.rc != 0
+
+- name: Установить Helmfile в temp-папке и удалить мусор
+  shell: |
+    mkdir -p /tmp/helmfile-install
+    cd /tmp/helmfile-install
+    wget -q https://github.com/helmfile/helmfile/releases/download/v1.1.2/helmfile_1.1.2_linux_amd64.tar.gz
+    tar -xzf helmfile_1.1.2_linux_amd64.tar.gz
+    sudo mv helmfile /usr/local/bin/
+    sudo chmod +x /usr/local/bin/helmfile
+    cd /
+    rm -rf /tmp/helmfile-install
+  args:
+    executable: /bin/bash
+
+- name: Проверка — Helmfile установлен
+  command: helmfile --version
+  register: helmfile_check
+  changed_when: false
+  failed_when: helmfile_check.rc != 0
+
+- name: Установить Helm plugin diff
+  become: false
+  shell: |
+    if ! helm plugin list | grep -q diff; then
+      helm plugin install https://github.com/databus23/helm-diff
+    fi
+  args:
+    executable: /bin/bash
+  register: helm_diff_result
+  changed_when: "'installed' in helm_diff_result.stdout"
+  failed_when: helm_diff_result.rc != 0 and "'already exists' not in helm_diff_result.stderr"
+
+- name: Проверка — Helm diff plugin установлен
+  become: false
+  shell: helm plugin list | grep -q 'diff'
+  register: helm_diff_plugin_check
+  changed_when: false
+  failed_when: helm_diff_plugin_check.rc != 0
+  

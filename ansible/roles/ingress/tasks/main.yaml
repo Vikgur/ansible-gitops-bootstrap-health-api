@@ -1,0 +1,18 @@
+- name: Установить ingress-nginx через Helm
+  become: true
+  shell: |
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+
+    until helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+      --namespace ingress-nginx --create-namespace \
+      --set controller.service.type=NodePort \
+      --set controller.service.nodePorts.http=30080 \
+      --set controller.service.nodePorts.https=30443 \
+      --set controller.ingressClassResource.name=nginx \
+      --set controller.ingressClass=nginx; do
+        echo "Helm operation in progress, retrying in 5s..."
+        sleep 5
+    done
+  args:
+    executable: /bin/bash
+  tags: [ingress]

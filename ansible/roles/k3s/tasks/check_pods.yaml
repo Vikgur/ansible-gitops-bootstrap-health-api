@@ -1,0 +1,10 @@
+- name: Проверить, что нет падающих подов
+  when: false
+  become: true
+  shell: |
+    total=$(k3s kubectl get pods -A --no-headers | wc -l)
+    running=$(k3s kubectl get pods -A --no-headers | grep -E 'Running|Completed' | wc -l)
+    [ "$total" -eq "$running" ]
+  register: pod_check
+  failed_when: pod_check.rc != 0
+  changed_when: false

@@ -1,0 +1,48 @@
+- name: Ждать освобождения apt lock
+  become: true
+  shell: |
+    for i in {1..60}; do
+      fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1 || exit 0
+      sleep 2
+    done
+    exit 1
+  args:
+    executable: /bin/bash
+  register: apt_lock
+  failed_when: apt_lock.rc != 0
+  changed_when: false
+  
+- name: Установка базовых пакетов без apt update
+  apt:
+    name:
+      - curl
+      - git
+      - htop
+      - net-tools
+    state: present
+    update_cache: false
+
+- name: Проверка - curl, git, htop, net-tools
+  shell: |
+    curl --version >/dev/null \
+    && git --version >/dev/null \
+    && htop --version >/dev/null \
+    && netstat --version >/dev/null
+  register: base_tools_check
+  changed_when: false
+  failed_when: base_tools_check.rc != 0
+
+- name: Установка Python-библиотеки для управления Kubernetes
+  apt:
+    name: python3-kubernetes
+    state: present
+
+- name: Проверить, что модуль kubernetes доступен для Python
+  ansible.builtin.command: python3 -c "import kubernetes"
+  changed_when: false
+  failed_when: false
+  register: k8s_module_check
+
+- name: Показать результат проверки kubernetes-модуля
+  ansible.builtin.debug:
+    var: k8s_module_check.stderr

@@ -1,0 +1,21 @@
+# .yamllint.yml
+extends: default
+
+rules:
+  line-length:
+    max: 120        # допустимая длина строки
+    level: warning  # не ошибка, а предупреждение
+  document-start:
+    present: false  # не требовать `---` в начале
+  trailing-spaces:
+    level: error    # пробелы в конце строк считаются ошибкой
+  new-line-at-end-of-file:
+    level: warning  # мягкая рекомендация
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
+  indentation:
+    indent-sequences: consistent
+  braces: disable   # отключить правило про фигурные скобки
+
+ignore: |
+  ansible/group_vars/vault/*

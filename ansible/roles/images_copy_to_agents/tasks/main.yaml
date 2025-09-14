@@ -1,0 +1,50 @@
+- name: Скопировать pause.tar с мастера на воркер
+  copy:
+    src: /home/ubuntu/health-api/ansible/roles/k3s/files/pause.tar
+    dest: /tmp/pause.tar
+    remote_src: yes
+  delegate_to: k3s-master
+  run_once: true
+
+- name: Распределить pause.tar на воркер
+  copy:
+    src: /tmp/pause.tar
+    dest: /tmp/pause.tar
+
+- name: Импортировать pause на агент
+  become: true
+  shell: /usr/local/bin/k3s ctr image import /tmp/pause.tar
+
+- name: Скопировать postgres.tar с мастера на воркер
+  copy:
+    src: /home/ubuntu/health-api/ansible/roles/k3s/files/postgres.tar
+    dest: /tmp/postgres.tar
+    remote_src: yes
+  delegate_to: k3s-master
+  run_once: true
+
+- name: Распределить postgres.tar на воркер
+  copy:
+    src: /tmp/postgres.tar
+    dest: /tmp/postgres.tar
+
+- name: Импортировать postgres на агент
+  become: true
+  shell: /usr/local/bin/k3s ctr image import /tmp/postgres.tar
+  
+- name: Скопировать jaeger.tar с мастера на воркер
+  copy:
+    src: /home/ubuntu/health-api/ansible/roles/k3s/files/jaeger.tar
+    dest: /tmp/jaeger.tar
+    remote_src: yes
+  delegate_to: k3s-master
+  run_once: true
+
+- name: Распределить jaeger.tar на воркер
+  copy:
+    src: /tmp/jaeger.tar
+    dest: /tmp/jaeger.tar
+
+- name: Импортировать jaeger на агент
+  become: true
+  shell: /usr/local/bin/k3s ctr image import /tmp/jaeger.tar

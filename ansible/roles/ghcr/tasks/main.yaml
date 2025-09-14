@@ -1,0 +1,49 @@
+- name: Логин в GHCR
+  community.docker.docker_login:
+    registry_url: ghcr.io
+    username: "{{ ghcr_user }}"
+    password: "{{ ghcr_token }}"
+
+- name: Проверка - логин в GHCR сохранён
+  stat:
+    path: /root/.docker/config.json
+  register: docker_config
+
+- name: Проверка - GHCR логин есть в config.json (через shell)
+  become: true
+  shell: grep -q '"ghcr.io"' /root/.docker/config.json
+  register: ghcr_login_check
+  changed_when: false
+  failed_when: ghcr_login_check.rc != 0
+
+- name: Создание GHCR секрета в Kubernetes (в health-api и argocd)
+  vars:
+    ns_list:
+      - health-api
+      - argocd
+  loop: "{{ ns_list }}"
+  loop_control:
+    loop_var: ns
+  shell: |
+    k3s kubectl create secret docker-registry ghcr-secret \
+      --docker-server=ghcr.io \
+      --docker-username={{ ghcr_user }} \
+      --docker-password={{ ghcr_token }} \
+      --docker-email={{ ghcr_email }} \
+      -n {{ ns }} || true
+  args:
+    executable: /bin/bash
+  no_log: true
+
+- name: Проверка - секрет ghcr-secret существует в Kubernetes
+  vars:
+    ns_list:
+      - health-api
+      - argocd
+  loop: "{{ ns_list }}"
+  loop_control:
+    loop_var: ns
+  shell: k3s kubectl get secret ghcr-secret -n {{ ns }}
+  register: ghcr_secret_check
+  changed_when: false
+  failed_when: ghcr_secret_check.rc != 0

@@ -1,0 +1,83 @@
+- name: Импортировать backend
+  become: true
+  shell: k3s ctr image import /tmp/backend.tar
+  args:
+    executable: /bin/bash
+
+- name: Импортировать frontend
+  become: true
+  shell: k3s ctr image import /tmp/frontend.tar
+  args:
+    executable: /bin/bash
+
+- name: Проверить наличие backend образа
+  become: true
+  shell: k3s ctr images list | grep -q ghcr.io/vik-devops-lab/health-api-backend:{{ VERSION }}
+  register: backend_check
+  failed_when: backend_check.rc != 0
+  changed_when: false
+
+- name: Проверить наличие frontend образа
+  become: true
+  shell: k3s ctr images list | grep -q ghcr.io/vik-devops-lab/health-api-frontend:{{ VERSION }}
+  register: frontend_check
+  failed_when: frontend_check.rc != 0
+  changed_when: false
+
+- name: Импортировать pause
+  become: true
+  shell: k3s ctr image import /tmp/pause.tar
+  args:
+    executable: /bin/bash
+
+- name: Импортировать postgres
+  become: true
+  shell: k3s ctr image import /tmp/postgres.tar
+  args:
+    executable: /bin/bash
+
+- name: Проверить наличие pause образа
+  become: true
+  shell: k3s ctr images list | grep -q docker.io/rancher/mirrored-pause:3.6
+  register: pause_check
+  failed_when: pause_check.rc != 0
+  changed_when: false
+
+- name: Проверить наличие postgres образа
+  become: true
+  shell: k3s ctr images list | grep -q docker.io/bitnami/postgresql:17.5.0
+  register: postgres_check
+  failed_when: postgres_check.rc != 0
+  changed_when: false
+
+- name: Импортировать jaeger
+  become: true
+  shell: k3s ctr image import /tmp/jaeger.tar
+  args:
+    executable: /bin/bash
+
+- name: Проверить наличие jaeger образа
+  become: true
+  shell: k3s ctr images list | grep -q jaegertracing/all-in-one:1.48
+  register: jaeger_check
+  failed_when: jaeger_check.rc != 0
+  changed_when: false
+
+- name: Копировать образ kube-webhook-certgen на воркеры
+  copy:
+    src: kube-webhook-certgen.tar
+    dest: /tmp/kube-webhook-certgen.tar
+    mode: '0644'
+
+- name: Импортировать образ kube-webhook-certgen на воркерах
+  become: true
+  shell: ctr image import /tmp/kube-webhook-certgen.tar
+  args:
+    executable: /bin/bash
+
+- name: Проверить наличие образа kube-webhook-certgen
+  become: true
+  shell: k3s ctr images list | grep -q ingress-nginx/kube-webhook-certgen
+  register: webhook_check
+  failed_when: webhook_check.rc != 0
+  changed_when: false

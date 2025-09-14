@@ -1,0 +1,11 @@
+- name: Копировать backend.tar на {{ target_ip }}
+  ansible.builtin.copy:
+    src: /tmp/backend.tar
+    dest: /tmp/backend.tar
+  delegate_to: "{{ target_ip }}"
+
+- name: Копировать frontend.tar на {{ target_ip }}
+  ansible.builtin.copy:
+    src: /tmp/frontend.tar
+    dest: /tmp/frontend.tar
+  delegate_to: "{{ target_ip }}"

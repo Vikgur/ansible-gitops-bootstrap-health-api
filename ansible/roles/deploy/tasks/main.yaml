@@ -1,0 +1,39 @@
+- name: Установить переменную VERSION
+  ansible.builtin.shell: |
+    export VERSION={{ VERSION }}
+  args:
+    executable: /bin/bash
+
+- name: Копировать kubeconfig в /tmp с правами ubuntu
+  become: true
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: /tmp/k3s-ubuntu.yaml
+    owner: ubuntu
+    group: ubuntu
+    mode: '0600'
+
+- name: Применить helmfile с нужным VERSION
+  shell: |
+    export VERSION={{ VERSION }}
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+    cd /home/ubuntu/health-api
+    helmfile -f helm/helmfile.prod.gotmpl apply
+  args:
+    executable: /bin/bash
+  become: false
+
+- name: Проверить, что подставился нужный тег
+  shell: |
+    export VERSION={{ VERSION }}
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+    helmfile -f helm/helmfile.prod.gotmpl template | grep ghcr
+  args:
+    chdir: /home/ubuntu/health-api
+    executable: /bin/bash
+  become: false
+  register: helm_output
+
+- name: Вывести образы с тегом
+  debug:
+    msg: "{{ helm_output.stdout_lines }}"

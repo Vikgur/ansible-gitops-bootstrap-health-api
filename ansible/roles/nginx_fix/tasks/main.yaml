@@ -1,0 +1,17 @@
+- name: Изменить сервис nginx с ClusterIP на NodePort
+  tags: [nginx_fix]
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Service
+    namespace: health-api
+    name: nginx-nginx
+    merge_type: strategic-merge
+    definition:
+      spec:
+        type: NodePort
+        externalTrafficPolicy: Local
+        ports:
+          - port: 80
+            nodePort: 30080
+            protocol: TCP
+            targetPort: 80

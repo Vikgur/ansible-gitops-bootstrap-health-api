@@ -1,0 +1,19 @@
+environment:
+  KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+argocd_namespace: argocd
+
+# Схема A (платформенная): argocd.gurko.ru
+# domain_base: gurko.ru
+# argocd_host: argocd.gurko.ru
+
+# Схема B (всё под health-api):
+domain_base: health.gurko.ru
+argocd_host: argocd.health.gurko.ru
+
+admin_password_bcrypt: $2y$10$XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Для TLS через cert-manager (опционально):
+# cluster_issuer: letsencrypt-prod
+# argocd_tls_secret_name: argocd-tls

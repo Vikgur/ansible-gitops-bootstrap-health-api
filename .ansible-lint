@@ -1,0 +1,10 @@
+profile: production
+exclude_paths:
+  - ansible/group_vars/vault/
+  - ansible/roles/**/files/*.tar
+warn_list:
+  - name[template]
+  - no-changed-when
+  - risky-shell-pipe
+parseable: true
+strict: true

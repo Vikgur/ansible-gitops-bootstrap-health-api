@@ -1,0 +1,30 @@
+repos:
+  - repo: https://github.com/ansible/ansible-lint
+    rev: v24.6.1
+    hooks:
+      - id: ansible-lint
+        files: ^ansible/(roles|playbook\\.yaml|group_vars|inventories)/
+        exclude: ^ansible/group_vars/vault/|\\.tar$|\\.tgz$
+
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        files: \\.ya?ml$
+        exclude: ^ansible/group_vars/vault/
+
+  - repo: local
+    hooks:
+      - id: shellcheck
+        name: shellcheck
+        entry: bash -lc 'shellcheck --severity=style --external-sources "$$@"'
+        language: system
+        types: [shell]
+        files: \\.sh$
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+        name: gitleaks (secrets scan)
+        args: ["protect", "--verbose", "--redact", "--config=.gitleaks.toml"]

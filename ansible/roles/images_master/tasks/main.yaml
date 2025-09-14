@@ -1,0 +1,68 @@
+- name: Скачать pause
+  become: true
+  shell: ctr image pull docker.io/rancher/mirrored-pause:3.6
+  args:
+    executable: /bin/bash
+
+- name: Скачать postgres
+  become: true
+  shell: ctr image pull docker.io/bitnami/postgresql:17.5.0-debian-12-r16
+  args:
+    executable: /bin/bash
+
+- name: Экспортировать pause
+  become: true
+  shell: ctr image export /home/ubuntu/pause.tar docker.io/rancher/mirrored-pause:3.6
+  args:
+    executable: /bin/bash
+
+- name: Экспортировать postgres
+  become: true
+  shell: ctr image export /home/ubuntu/postgres.tar docker.io/bitnami/postgresql:17.5.0-debian-12-r16
+  args:
+    executable: /bin/bash
+
+- name: Переместить pause.tar в роль
+  become: true
+  shell: mv /home/ubuntu/pause.tar /home/ubuntu/health-api/ansible/roles/k3s/files/pause.tar
+  args:
+    executable: /bin/bash
+
+- name: Переместить postgres.tar в роль
+  become: true
+  shell: mv /home/ubuntu/postgres.tar /home/ubuntu/health-api/ansible/roles/k3s/files/postgres.tar
+  args:
+    executable: /bin/bash
+
+- name: Скачать jaeger
+  become: true
+  shell: docker pull jaegertracing/all-in-one:1.48
+  args:
+    executable: /bin/bash
+
+- name: Экспортировать jaeger
+  become: true
+  shell: docker save jaegertracing/all-in-one:1.48 -o /home/ubuntu/jaeger.tar
+  args:
+    executable: /bin/bash
+
+- name: Переместить jaeger.tar в роль
+  become: true
+  shell: mv /home/ubuntu/jaeger.tar /home/ubuntu/health-api/ansible/roles/k3s/files/jaeger.tar
+  args:
+    executable: /bin/bash
+
+- name: Скачать и экспортировать образ kube-webhook-certgen
+  become: true
+  shell: |
+    ctr image pull registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.6.0
+    ctr image export /home/ubuntu/kube-webhook-certgen.tar registry.k8s.io/ingress-nginx/kube-webhook-certgen:v1.6.0
+  args:
+    executable: /bin/bash
+    creates: /home/ubuntu/kube-webhook-certgen.tar
+
+- name: Переместить kube-webhook-certgen.tar в роль
+  become: true
+  shell: mv /home/ubuntu/kube-webhook-certgen.tar /home/ubuntu/health-api/ansible/roles/k3s/files/kube-webhook-certgen.tar
+  args:
+    executable: /bin/bash

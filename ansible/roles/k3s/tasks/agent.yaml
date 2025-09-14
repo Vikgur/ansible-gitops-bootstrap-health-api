@@ -1,0 +1,59 @@
+- name: Создать директорию /root/k3s-agent
+  become: true
+  file:
+    path: /root/k3s-agent
+    state: directory
+    mode: '0755'
+
+- name: Скопировать бинарь k3s
+  become: true
+  copy:
+    src: files/k3s
+    dest: /usr/local/bin/k3s
+    mode: '0755'
+
+- name: Скопировать ENV-файл агента
+  become: true
+  copy:
+    src: files/k3s-agent.env
+    dest: /root/k3s-agent/k3s-agent.env
+    mode: '0600'
+
+- name: Запустить k3s-agent вручную
+  become: true
+  shell: |
+    nohup env $(cat /root/k3s-agent/k3s-agent.env | xargs) /usr/local/bin/k3s agent >> /var/log/k3s-agent.log 2>&1 &
+  args:
+    executable: /bin/bash
+
+- name: Проверить, что k3s-agent запущен (через pgrep)
+  become: true
+  shell: pgrep -f '/usr/local/bin/k3s agent'
+  register: k3s_agent_status
+  changed_when: false
+  failed_when: k3s_agent_status.rc != 0
+
+- name: Вывести лог и завалить плейбук при ошибке
+  become: true
+  shell: tail -40 /var/log/k3s-agent.log
+  when: k3s_agent_status.rc != 0
+  register: agent_log
+  failed_when: true
+
+- debug:
+    var: agent_log.stdout
+  when: k3s_agent_status.rc != 0 and agent_log is defined
+
+- name: Ждать появления ctr по полному пути
+  become: true
+  shell: |
+    for i in {1..90}; do
+      [ -x /var/lib/rancher/k3s/data/current/bin/ctr ] && exit 0
+      sleep 1
+    done
+    exit 1
+  args:
+    executable: /bin/bash
+  register: wait_ctr
+  failed_when: wait_ctr.rc != 0
+  changed_when: false
