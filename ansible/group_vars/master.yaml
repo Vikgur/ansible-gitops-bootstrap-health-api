@@ -1,21 +1,19 @@
 environment:
   KUBECONFIG: /etc/rancher/k3s/k3s.yaml
 
-argocd_config_repo_path: /home/ubuntu/argocd-config-health-api
-
 kubeconfig_path: /etc/rancher/k3s/k3s.yaml
 argocd_namespace: argocd
 
-# Схема A (платформенная): argocd.gurko.ru
-# domain_base: gurko.ru
-# argocd_host: argocd.gurko.ru
+argocd_sso_mode: oidc  # или dex или login
+github_oauth_client_id: YOUR_ID
+github_oauth_client_secret: YOUR_SECRET  # если используется Dex
 
-# Схема B (всё под health-api):
+admin_password_bcrypt: $2y$10$XXXXXXXXXXXXXXXXX # если используется login
+
+# TLS
+cluster_issuer: letsencrypt-prod
+argocd_tls_secret_name: argocd-tls
+
+# Домен и host
 domain_base: health.gurko.ru
 argocd_host: argocd.health.gurko.ru
-
-admin_password_bcrypt: $2y$10$XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
-
-# Для TLS через cert-manager (опционально):
-# cluster_issuer: letsencrypt-prod
-# argocd_tls_secret_name: argocd-tls

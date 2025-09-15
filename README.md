@@ -20,7 +20,11 @@
   - [Логика шагов деплоя](#логика-шагов-деплоя)  
 - [Плейбук: шаги выполнения](#плейбук-шаги-выполнения)  
 - [Внедренные DevSecOps практики](#внедренные-devsecops-практики)  
-  - [Доступ и безопасность](#доступ-и-безопасность)
+  - [Доступ (Аутентификация)](#доступ-аутентификация)  
+    - [SSO GitHub OAuth (режим `oidc`)](#sso-github-oauth-режим-oidc)  
+    - [SSO Dex (режим `dex`)](#sso-dex-режим-dex)  
+    - [Логин/Пароль (режим `login`)](#логинпароль-режим-login)  
+    - [Контроль доступа и безопасность](#контроль-доступа-и-безопасность)
   - [RBAC и защита Argo CD](#rbac-и-защита-argo-cd)
   - [Архитектура безопасности](#архитектура-безопасности)  
   - [Покрытие](#покрытие)  
@@ -265,29 +269,57 @@
 
 Для работы проверок должны быть установлены: **ansible-lint**, **yamllint**, **shellcheck**, **pre-commit**, **gitleaks**.
 
-## Доступ и безопасность
+## Доступ (аутентификация)
 
-**Генерация bcrypt для UI Argo CD:**
+Проект поддерживает три режима аутентификации в Argo CD:
+
+* `oidc` — прямое подключение к GitHub OAuth (основной)
+* `dex` — через OIDC-прокси Dex
+* `login` — базовый логин/пароль через bcrypt
+
+### SSO GitHub OAuth (режим `oidc`)
+
+В продовой конфигурации активен SSO через GitHub:
+
+* Прямое подключение через `oidc.config`
+* Используются группы `g:devops`, `g:qa` из GitHub-организации
+* Настройки безопасности (RBAC, AppProjects) работают в связке с группами
+
+UI Argo CD показывает кнопку "Login with GitHub".
+
+### SSO Dex (режим `dex`)
+
+В проекте доступна также реализация SSO через Dex:
+
+* Dex выступает посредником между Argo CD и GitHub (OIDC proxy)
+* Используются те же GitHub-группы `g:devops`, `g:qa`
+* Настройки RBAC и AppProjects работают аналогично режиму `oidc`
+
+### Логин/пароль (режим `login`)
+
+Для генерации bcrypt-хэша UI-пароля:
 
 ```bash
 htpasswd -nbBC 10 admin 'MyStrongPass123' | cut -d: -f2
 ```
 
-* **admin** — это логин.
-* **MyStrongPass123** — это пароль.
-* На выходе получится bcrypt-хэш, который вставляется в `group_vars/master.yaml`.
+* **admin** — логин
+* **MyStrongPass123** — пароль
 
-В Argo CD будет доступ:
+Результат вставляется в `group_vars/master.yaml` как `admin_password_bcrypt`.
+
+После деплоя будет доступ:
 
 * логин: `admin`
 * пароль: `MyStrongPass123`
 
-**Контроль доступа:**
+Используется в локальной отладке или изоляции без внешнего SSO.
 
-* Логин/пароль (`admin` + bcrypt-хэш)
-* Ограничение по IP (Ingress annotations / firewall)
+### Контроль доступа и безопасность
 
-Если поднят Ingress на `argocd.<домен>` и он доступен из интернета, то страницу входа сможет открыть любой.
+* Включён RBAC по группам (описан в `argocd/cm/argocd-rbac-cm.yaml`)
+* В `oidc` и `dex`-режимах права назначаются автоматически при входе через GitHub
+* Для `login`-режима доступ ограничивается IP через Ingress Annotations
 
 ## RBAC и защита Argo CD
 
@@ -403,14 +435,13 @@ make lint-security
 
 Краткий маппинг практик проекта на OWASP Top-10:
 
-- **A1 Broken Access Control** → закрытые воркеры, доступ только через мастер, паттерн stage/prod, централизованный RBAC в Argo CD с разграничением по ролям и namespace.
-- **A2 Cryptographic Failures** → Ansible Vault для секретов, bcrypt-хэш для пароля Argo CD, `.vault_pass.txt` исключён из Git.
-- **A3 Injection** → отсутствие секретов в коде, использование ansible-lint, yamllint, shellcheck.
-- **A4 Insecure Design** → строгая структура stage/prod, ansible-lint c production-профилем, контроль sync-окон в prod.
-- **A5 Security Misconfiguration** → закрытые порты, deny-by-default, ограничение прав в Argo CD, проверка конфигураций.
-- **A6 Vulnerable and Outdated Components** → частично: ansible-lint проверяет роли, базовое обновление пакетов через common-роль.
-- **A7 Identification and Authentication Failures** → bcrypt-авторизация в Argo CD, централизованный доступ через RBAC и группы (`g:devops`, `g:qa`), токены GHCR в Vault.
-- **A8 Software and Data Integrity Failures** → pre-commit хуки, централизованная доставка образов через master.
-- **A9 Security Logging and Monitoring Failures** → частично: планируется централизованное логирование (Loki, Promtail).
-- **A10 SSRF** → ограничение на внешние `get_url`, контроль источников в задачах Ansible.
-
+- **A1 Broken Access Control** → закрытые воркеры, доступ только через мастер, паттерн stage/prod, централизованный RBAC в Argo CD с разграничением по ролям и namespace, авторизация строго через GitHub SSO.
+- **A2 Cryptographic Failures** → все секреты — в Ansible Vault, bcrypt-хэш пароля для `login`-режима, файл `.vault_pass.txt` исключён из Git.
+- **A3 Injection** → в репозиториях нет открытых секретов, используются ansible-lint, yamllint, shellcheck для контроля качества кода.
+- **A4 Insecure Design** → чёткое разделение stage/prod, продовый профиль ansible-lint, контроль sync-окон в проде.
+- **A5 Security Misconfiguration** → закрытые порты, deny-by-default, строгий RBAC в Argo CD, валидация конфигураций.
+- **A6 Vulnerable and Outdated Components** → частично: lint-проверки ролей, регулярные обновления пакетов через `common`-роль.
+- **A7 Identification and Authentication Failures** → централизованный доступ через GitHub SSO, роли на основе GitHub-групп (`g:devops`, `g:qa`), bcrypt для логин-режима, GHCR-токены хранятся в Vault.
+- **A8 Software and Data Integrity Failures** → pre-commit хуки, сборка и доставка образов централизованы через мастер.
+- **A9 Security Logging and Monitoring Failures** → частично реализовано: в планах внедрение централизованного логирования (Loki, Promtail).
+- **A10 SSRF** → запрет на небезопасные `get_url`, контроль источников в задачах Ansible.

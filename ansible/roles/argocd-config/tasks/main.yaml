@@ -1,8 +1,82 @@
-- name: Применить конфигурацию Argo CD из argocd-config-health-api
-  shell: |
-    kustomize build {{ argocd_config_repo_path }} | kubectl apply -f -
-  args:
-    executable: /bin/bash
-  register: result
-  changed_when: "'configured' in result.stdout"
-  tags: [argocd, config]
+- name: Проверить, что каталог с конфигурацией Argo CD существует
+  ansible.builtin.stat:
+    path: "{{ argocd_config_repo_path }}"
+  register: config_repo_path
+
+- name: Прервать, если репозиторий конфигурации Argo CD не найден
+  ansible.builtin.fail:
+    msg: "Репозиторий конфигурации Argo CD не найден по пути: {{ argocd_config_repo_path }}"
+  when: not config_repo_path.stat.exists
+
+- name: Установить kustomize через snap (если не установлен)
+  ansible.builtin.shell: |
+    if ! command -v kustomize &> /dev/null; then
+      sudo snap install kustomize
+    fi
+  tags: [packages]
+
+- name: Применить ConfigMap (argocd-cm.yaml)
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
+    state: present
+    src: "{{ argocd_config_repo_path }}/argocd/cm/argocd-cm.yaml"
+    namespace: "{{ argocd_namespace }}"
+
+- name: Применить RBAC (argocd-rbac-cm.yaml)
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
+    state: present
+    src: "{{ argocd_config_repo_path }}/argocd/cm/argocd-rbac-cm.yaml"
+    namespace: "{{ argocd_namespace }}"
+
+- name: Применить AppProject: stage
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
+    state: present
+    src: "{{ argocd_config_repo_path }}/argocd/projects/project-stage.yaml"
+    namespace: "{{ argocd_namespace }}"
+
+- name: Применить AppProject: prod
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
+    state: present
+    src: "{{ argocd_config_repo_path }}/argocd/projects/project-prod.yaml"
+    namespace: "{{ argocd_namespace }}"
+
+- name: Применить репозиторий: gitops-apps
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
+    state: present
+    src: "{{ argocd_config_repo_path }}/argocd/repos/repo-gitops-apps.yaml"
+    namespace: "{{ argocd_namespace }}"
+
+- name: Применить репозиторий: helm-charts
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
+    state: present
+    src: "{{ argocd_config_repo_path }}/argocd/repos/repo-helm-charts.yaml"
+    namespace: "{{ argocd_namespace }}"
+
+- name: Применить secret с паролем (если выбран режим логин/пароль)
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
+    state: present
+    src: "{{ argocd_config_repo_path }}/argocd/secrets/argocd-secret.yaml"
+    namespace: "{{ argocd_namespace }}"
+  when: argocd_sso_mode | default('dex') == 'dex'
+
+- name: Применить конфигурацию oidc.config (если выбран режим oidc)
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
+    state: present
+    src: "{{ argocd_config_repo_path }}/argocd/cm/oidc-config.yaml"
+    namespace: "{{ argocd_namespace }}"
+  when: argocd_sso_mode | default('dex') == 'oidc'
+
+- name: Применить secret с паролем (если выбран режим логин/пароль)
+  kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
+    state: present
+    namespace: "{{ argocd_namespace }}"
+    src: "{{ role_path }}/files/argocd/argocd-secret.yaml"
+  when: argocd_sso_mode == 'login'
