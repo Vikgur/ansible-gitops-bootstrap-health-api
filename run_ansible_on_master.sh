@@ -86,11 +86,7 @@ mkdir -p ~/health-api/ansible/roles/k3s/files/
 cp ~/k3s-agent ~/health-api/ansible/roles/k3s/files/k3s
 cp ~/k3s-agent.env ~/health-api/ansible/roles/k3s/files/k3s-agent.env
 
-# 9. Установка Ansible и запуск плейбука
-sudo apt install -y ansible
-cd ~/health-api/ansible
-
-# 9.1. Получение/обновление конфигурации Argo CD
+# 9. Получение/обновление конфигурации Argo CD argocd-config-health-api
 if [ ! -d ../argocd-config-health-api ]; then
   git clone https://gitlab.com/vikgur/argocd-config-health-api.git ../argocd-config-health-api
 else
@@ -99,7 +95,20 @@ else
   cd ../ansible
 fi
 
-# 9.2. Запуск Ansible: установка ролей и применение плейбука (включая argocd-config)
+# 10. Получение/обновление gitops-apps-health-api
+if [ ! -d ../gitops-apps-health-api ]; then
+  git clone https://gitlab.com/vikgur/gitops-apps-health-api.git ../gitops-apps-health-api
+else
+  cd ../gitops-apps-health-api
+  git pull
+  cd ../ansible
+fi
+
+# 11. Установка Ansible и запуск плейбука
+sudo apt install -y ansible
+cd ~/health-api/ansible
+
+# 12. Запуск Ansible: установка ролей и применение плейбука (включая argocd-config)
 ansible-galaxy collection install -r requirements.yml
 ANSIBLE_ROLES_PATH=roles \
 ansible-playbook -i inventories/$ENV/hosts.yaml playbook.yaml \

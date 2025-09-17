@@ -49,6 +49,7 @@
 * полная автоматизация установки и настройки master/worker-нод;  
 * подготовка окружения для Argo CD и GitOps-паттерна;  
 * применение конфигурации Projects, RBAC и Git-репозиториев из [`argocd-config-health-api`](https://github.com/vikgur/argocd-config-health-api);  
+* применение Argo CD Applications (`stage`, `prod`) из [`gitops-apps-health-api`](https://github.com/vikgur/gitops-apps-health-api) с автоматическим подтягиванием манифестов по переменной окружения;
 * настройка доступа к приватному реестру GHCR;  
 * установка ingress-контроллера;  
 * использование [Makefile](#точка-запуска-makefile) и серии `bash-скриптов` для воспроизводимого запуска шагов;  
@@ -108,7 +109,7 @@
 
 * **add_ips_to_hosts.sh** — собирает IP-адреса нод и формирует `ansible/inventories/<env>/hosts.yaml`.
 * **sync_to_master.sh** — синхронизирует каталоги (`ansible/`, `helm/`, `charts/`) на мастер-ноду.
-* **run_ansible_on_master.sh** — запускает Ansible-плейбук уже с мастер-ноды (используется в целях `make deploy`, `make bootstrap-argocd`) и включает применение конфигурации Argo CD (Projects, RBAC, Git-репозитории) из склонированного GitOps-репозитория.
+* **run_ansible_on_master.sh** — запускает Ansible-плейбук уже с мастер-ноды (используется в целях `make deploy`, `make bootstrap-argocd`) и включает применение конфигурации Argo CD (Projects, RBAC, Git-репозитории) из склонированных GitOps-репозиториев.
 
 ---
 
@@ -146,7 +147,8 @@
 ### roles/
 
 #### Основные (GitOps):
-   * **argocd** — установка и bootstrap Argo CD в кластер.  
+   * **argocd** — установка и bootstrap Argo CD в кластер. 
+   * **argocd-apps** — применение Argo CD Applications (`stage`, `prod`) из заранее клонированного репозитория `gitops-apps-health-api`. 
    * **argocd-config** — настройка Projects, RBAC, Git-репозиториев и параметров контроллера Argo CD из клонированного репо argocd-config-health-api.
    * **common** — базовые настройки окружения (пакеты, ssh, системные утилиты).
    * **docker** — установка и настройка docker/ctr утилит, нужных для работы с образами.  
@@ -259,7 +261,8 @@
 8. **GHCR секреты** — создание `ghcr-secret` в `argocd` и `health-api` для доступа к приватным образам.
 9. **Проверки** — проверка, что все ноды находятся в статусе Ready.
 10. **Argo CD Config** — применение конфигурации Argo CD (Projects, RBAC, Repos) из `argocd-config-health-api`.
-11. **NodePort (опционально)** — патчинг ingress-сервиса в режим `NodePort` для доступа без внешнего ingress-контроллера.
+11. **Argo CD Applications** — применение `Application`-манифестов (`stage`, `prod`) из репозитория `gitops-apps-health-api` с помощью роли `argocd-apps`.
+12. **NodePort (опционально)** — патчинг ingress-сервиса в режим `NodePort` для доступа без внешнего ingress-контроллера.
 
 ---
 

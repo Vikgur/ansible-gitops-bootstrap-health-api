@@ -71,13 +71,19 @@
         name: k3s
         tasks_from: check_nodes
 
-# Применение конфигурации Argo CD
 - name: Настройка Argo CD (config, projects, repos)
   hosts: master
   become: true
   gather_facts: false
   roles:
     - argocd-config
+
+- name: Применить Argo CD Applications
+  hosts: master
+  become: true
+  gather_facts: false
+  roles:
+    - argocd-apps
 
 # Опционально: если нужен NodePort для nginx
 - name: Патчим nginx-сервис до NodePort
