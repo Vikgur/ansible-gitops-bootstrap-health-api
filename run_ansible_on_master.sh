@@ -109,9 +109,16 @@ sudo apt install -y ansible
 cd ~/health-api/ansible
 
 # 12. Запуск Ansible: установка ролей и применение плейбука (включая argocd-config)
+if [ "$ENV" = "prod" ]; then
+  VERSION=$(git describe --tags --abbrev=0)
+else
+  SHORT_SHA=$(git rev-parse --short HEAD)
+  VERSION="stage-$SHORT_SHA"
+fi
+
 ansible-galaxy collection install -r requirements.yml
 ANSIBLE_ROLES_PATH=roles \
 ansible-playbook -i inventories/$ENV/hosts.yaml playbook.yaml \
 --vault-password-file .vault_pass.txt \
---extra-vars "ENV=prod VERSION=v1.0.17"
+--extra-vars "ENV=$ENV VERSION=$VERSION"
 EOF
